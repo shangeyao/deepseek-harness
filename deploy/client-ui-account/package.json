@@ -1,7 +1,7 @@
 {
   "name": "@shangeyao/dsh-client-ui-account",
   "description": "LDAP 网关部署：侧边栏底部当前用户信息与退出登录",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

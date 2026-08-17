@@ -1,6 +1,6 @@
 {
   "name": "@shangeyao/calb-ldap-gateway",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CALB AIStudio LDAP 多用户网关：认证、按用户隔离 DSH_HOME、反代 dsh web",
   "type": "module",
   "main": "lib/index.js",

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const CLI_MANIFEST = join(ROOT, 'apps/cli/package.json')
 const OUT_DIR = join(ROOT, '.calb-publish')
-const VERSION = process.env.CALB_PUBLISH_VERSION?.trim() || '0.1.0'
+const VERSION = process.env.CALB_PUBLISH_VERSION?.trim() || '0.1.1'
 
 mkdirSync(OUT_DIR, { recursive: true })
 
