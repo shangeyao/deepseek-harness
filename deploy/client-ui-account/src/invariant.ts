@@ -1,6 +1,6 @@
 /**
- * Package-owned invariant companion for `@calb/dsh-client-ui-account`.
- * @module @calb/dsh-client-ui-account/invariant
+ * Package-owned invariant companion for `@shangeyao/dsh-client-ui-account`.
+ * @module @shangeyao/dsh-client-ui-account/invariant
  */
 
 import type { Context } from '@deepseek-ai/cordis'
