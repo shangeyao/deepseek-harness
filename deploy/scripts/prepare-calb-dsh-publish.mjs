@@ -37,7 +37,7 @@ writeFileSync(CLI_MANIFEST, `${JSON.stringify(published, null, 2)}\n`)
 try {
   execFileSync('pnpm', ['--dir', 'apps/cli', 'pack', '--pack-destination', OUT_DIR], {
     cwd: ROOT,
-    stdio: 'inherit',
+    stdio: ['ignore', 'ignore', 'ignore'],
   })
 } finally {
   writeFileSync(CLI_MANIFEST, original)
