@@ -21,9 +21,10 @@ GitHub Packages 要求 npm 包的 **scope 必须与 GitHub 用户名/组织一�
 
 ## 方式一：GitHub Actions（推荐）
 
-1. 确保 GitHub 账户 **Billing** 可用（Actions 需计费额度）
-2. 打开 **Actions → Publish CALB Packages → Run workflow**
-3. 选择 `all` 并点击 **Run workflow**
+1. 确保 GitHub 账户 **Billing** 可用（[Settings → Billing](https://github.com/settings/billing)）。若 Actions 报 `recent account payments have failed`，需先修复付款方式。
+2. 仓库 **Settings → Actions → General → Workflow permissions** 设为 **Read and write**。
+3. 打开 **Actions → Publish CALB Packages → Run workflow**
+4. 选择 `all` 并点击 **Run workflow**
 
 推送或 PR 若改动了 `deploy/**` 或 `apps/cli/package.json`，会自动跑 **Validate**（只构建不上传）；只有手动 dispatch 才会发布。
 

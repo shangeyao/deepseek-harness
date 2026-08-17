@@ -2,6 +2,10 @@
 #
 # 手动发布：Actions → Publish CALB Packages → package=all → Run workflow
 # 推送/PR：Validate only（构建检查，不上传）。
+#
+# 若 Actions 报 Billing 错误，在本地执行：
+#   gh auth refresh -h github.com -s write:packages,read:packages
+#   ./deploy/scripts/publish-calb-packages.sh all
 name: Publish CALB Packages
 
 on:
@@ -41,8 +45,9 @@ concurrency:
 
 env:
   PRIMARY_NODE_VERSION: '24'
-  CALB_PUBLISH_VERSION: '0.1.0'
+  CALB_PUBLISH_VERSION: '0.1.1'
   DSH_TELEMETRY_DISABLED: '1'
+  NPM_CONFIG_REGISTRY: https://npm.pkg.github.com
 
 jobs:
   validate:
@@ -99,35 +104,37 @@ jobs:
         run: pnpm run build
 
       - name: Build account plugin
-        if: inputs.package == 'all' || inputs.package == 'dsh-client-ui-account' || inputs.package == 'dsh'
+        if: github.event.inputs.package == 'all' || github.event.inputs.package == 'dsh-client-ui-account' || github.event.inputs.package == 'dsh'
         run: pnpm --filter @shangeyao/dsh-client-ui-account run bundle
 
       - name: Publish @shangeyao/dsh-client-ui-account
-        if: inputs.package == 'all' || inputs.package == 'dsh-client-ui-account'
+        if: github.event.inputs.package == 'all' || github.event.inputs.package == 'dsh-client-ui-account'
         working-directory: deploy/client-ui-account
-        run: npm publish --access restricted
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build LDAP gateway
-        if: inputs.package == 'all' || inputs.package == 'calb-ldap-gateway'
+        if: github.event.inputs.package == 'all' || github.event.inputs.package == 'calb-ldap-gateway'
         run: pnpm --filter @shangeyao/calb-ldap-gateway run build
 
       - name: Publish @shangeyao/calb-ldap-gateway
-        if: inputs.package == 'all' || inputs.package == 'calb-ldap-gateway'
+        if: github.event.inputs.package == 'all' || github.event.inputs.package == 'calb-ldap-gateway'
         working-directory: deploy/ldap-gateway
-        run: npm publish --access restricted
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Stage @shangeyao/dsh tarball
-        if: inputs.package == 'all' || inputs.package == 'dsh'
+        if: github.event.inputs.package == 'all' || github.event.inputs.package == 'dsh'
         id: dsh_tarball
         run: echo "path=$(node deploy/scripts/prepare-calb-dsh-publish.mjs)" >> "$GITHUB_OUTPUT"
+        env:
+          CALB_PUBLISH_VERSION: ${{ env.CALB_PUBLISH_VERSION }}
 
       - name: Publish @shangeyao/dsh
-        if: inputs.package == 'all' || inputs.package == 'dsh'
-        run: npm publish "${{ steps.dsh_tarball.outputs.path }}" --access restricted
+        if: github.event.inputs.package == 'all' || github.event.inputs.package == 'dsh'
+        run: npm publish "${{ steps.dsh_tarball.outputs.path }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
