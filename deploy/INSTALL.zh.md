@@ -69,6 +69,25 @@ dsh --version
 calb-gateway --help 2>/dev/null || which calb-gateway
 ```
 
+## 故障排查
+
+### `Failed to load plugins … @calb/dsh-client-ui-account`
+
+旧版 patch 或全局安装仍引用 `@calb/*`。任选其一：
+
+```bash
+# 1. 重新安装最新插件（推荐）
+npm install -g @shangeyao/dsh-client-ui-account@latest
+
+# 2. 从源码构建时重新 bundle
+pnpm --filter @shangeyao/dsh-client-ui-account run bundle
+
+# 3. 若 patch 仍写 @calb，可临时用 npm alias 兼容
+npm install -g @calb/dsh-client-ui-account@npm:@shangeyao/dsh-client-ui-account@0.1.0
+```
+
+确认 `DSH_PATCH` 未指向旧文件（应为空，使用包内 `profiles/ldap-web.patch.yml`）。修复后重启 `calb-gateway` 并重新登录。
+
 ## 发布方（维护者）
 
 GitHub Actions：**Publish CALB Packages** → 选择 `all` → Run workflow。
