@@ -1,0 +1,110 @@
+# 发布 CALB 自有 npm 包到 GitHub Packages（@shangeyao scope）。
+# Actions 内置 GITHUB_TOKEN 具备 packages:write，无需额外 secrets。
+#
+# 手动发布：Actions → Publish CALB Packages → Run workflow
+# 推送/PR：仅验证能否 install + bundle，不会上传 registry。
+name: Publish CALB Packages
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/client-ui-account/**'
+      - 'deploy/profiles/**'
+      - 'apps/cli/package.json'
+      - '.github/workflows/publish-calb-packages.yml'
+      - 'pnpm-lock.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/client-ui-account/**'
+      - 'deploy/profiles/**'
+      - 'apps/cli/package.json'
+      - '.github/workflows/publish-calb-packages.yml'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        default: dsh-client-ui-account
+        type: choice
+        options:
+          - dsh-client-ui-account
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-calb-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  validate:
+    name: Validate CALB package build
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Bundle account plugin
+        run: pnpm --filter @shangeyao/dsh-client-ui-account run bundle
+
+      - name: Typecheck account plugin
+        run: pnpm --filter @shangeyao/dsh-client-ui-account run typecheck
+
+  publish:
+    name: Publish to GitHub Packages
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          registry-url: https://npm.pkg.github.com
+          scope: '@shangeyao'
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Bundle account plugin
+        if: inputs.package == 'dsh-client-ui-account'
+        run: pnpm --filter @shangeyao/dsh-client-ui-account run bundle
+
+      - name: Typecheck account plugin
+        if: inputs.package == 'dsh-client-ui-account'
+        run: pnpm --filter @shangeyao/dsh-client-ui-account run typecheck
+
+      - name: Publish @shangeyao/dsh-client-ui-account
+        if: inputs.package == 'dsh-client-ui-account'
+        working-directory: deploy/client-ui-account
+        run: npm publish --access restricted
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        if: inputs.package == 'dsh-client-ui-account'
+        run: |
+          echo "Published @shangeyao/dsh-client-ui-account"
+          echo "https://github.com/${{ github.repository }}/pkgs/npm/dsh-client-ui-account"

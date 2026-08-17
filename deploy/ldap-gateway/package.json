@@ -1,0 +1,22 @@
+{
+  "name": "@calb/dsh-ldap-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LDAP auth gateway with per-user dsh web instances and isolated DSH_HOME",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "ldapts": "^8.0.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,175 @@
+/* 侧边栏底部账户行：与 Settings 触发器共享 34px 行高 / 36px 轨道圆按钮节奏。 */
+
+.row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% + 8px);
+  min-height: 34px;
+  margin: 4px -4px;
+  padding: 4px 2px 4px 10px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #31c89a, #0e7e61);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.logout {
+  flex: none;
+  border: none;
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.logout:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.logout:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* 折叠轨道：36px 圆按钮 + 弹出菜单 */
+.railWrap {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin: 8px 0 4px;
+}
+
+.railButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.railButton:hover,
+.railButton[data-open] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.railAvatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #31c89a, #0e7e61);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.menu {
+  position: absolute;
+  left: calc(100% + 8px);
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+  padding: 10px;
+  border: 1px solid var(--dsw-alias-separator-opaque);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-elevated);
+  box-shadow: var(--dsw-shadow-lv2);
+}
+
+.menuHead {
+  padding: 2px 4px 6px;
+}
+
+.menuName {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.menuSub {
+  margin-top: 2px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  word-break: break-all;
+}
+
+.menuLogout {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuLogout:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.menuLogout:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

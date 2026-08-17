@@ -1,0 +1,15 @@
+# LDAP 多用户 Web 部署覆盖层。
+# 网关启动时默认通过 DSH_PATCH 加载。
+
+- id: web-runtime
+  config:
+    printUrl: false
+    surfaceContext: true
+    trustedHosts: []
+
+# 目录选择器由 directory-picker-auto 在启动时解析；网关 spawn 时设置
+# SSH_CONNECTION 强制 browse（应用内目录浏览），host 与 client 成对挂载。
+
+- insert:
+    - id: ui-account
+      name: '@shangeyao/dsh-client-ui-account'
