@@ -1,22 +1,39 @@
 {
-  "name": "@calb/dsh-ldap-gateway",
+  "name": "@shangeyao/calb-ldap-gateway",
   "version": "0.1.0",
-  "private": true,
+  "description": "CALB AIStudio LDAP 多用户网关：认证、按用户隔离 DSH_HOME、反代 dsh web",
   "type": "module",
-  "description": "LDAP auth gateway with per-user dsh web instances and isolated DSH_HOME",
+  "main": "lib/index.js",
+  "bin": {
+    "calb-gateway": "lib/index.js"
+  },
+  "files": [
+    "lib",
+    "public",
+    "profiles"
+  ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "start": "node --import tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node lib/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shangeyao/CALB-AIStudio.git",
+    "directory": "deploy/ldap-gateway"
+  },
+  "license": "MIT",
   "dependencies": {
     "ldapts": "^8.0.9"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
 }

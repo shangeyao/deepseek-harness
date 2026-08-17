@@ -1,0 +1,8 @@
+# 复制到 ~/.npmrc 或在安装前 export NODE_AUTH_TOKEN
+# Token 需要 read:packages（安装）或 write:packages（发布）
+
+@shangeyao:registry=https://npm.pkg.github.com/
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+
+# @deepseek-ai 依赖从 npmjs 公共仓库解析（@shangeyao/dsh 的运行时依赖）
+@deepseek-ai:registry=https://registry.npmjs.org/

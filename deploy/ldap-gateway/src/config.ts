@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const DEPLOY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+const DEPLOY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_DSH_PATCH = join(DEPLOY_ROOT, 'profiles', 'ldap-web.patch.yml')
 
 export interface LdapConfig {

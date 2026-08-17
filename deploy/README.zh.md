@@ -22,6 +22,10 @@ Harness 原生 Web 服务不含认证层；网关负责登录与会话 Cookie，
 
 ## 前置条件
 
+**任意机器 npm 安装（推荐）**：见 [INSTALL.zh.md](./INSTALL.zh.md)，无需克隆仓库。
+
+**从源码运行**（开发调试）：
+
 1. 已在仓库根目录完成 Harness 构建（含 LDAP 账户侧边栏插件）：
 
 ```bash

@@ -1,35 +1,35 @@
-# 发布 CALB 自有 npm 包到 GitHub Packages（@shangeyao scope）。
-# Actions 内置 GITHUB_TOKEN 具备 packages:write，无需额外 secrets。
+# 发布 CALB 全套可安装包到 GitHub Packages（@shangeyao scope）。
 #
-# 手动发布：Actions → Publish CALB Packages → Run workflow
-# 推送/PR：仅验证能否 install + bundle，不会上传 registry。
+# 手动发布：Actions → Publish CALB Packages → package=all → Run workflow
+# 推送/PR：Validate only（构建检查，不上传）。
 name: Publish CALB Packages
 
 on:
   pull_request:
     paths:
-      - 'deploy/client-ui-account/**'
-      - 'deploy/profiles/**'
+      - 'deploy/**'
       - 'apps/cli/package.json'
       - '.github/workflows/publish-calb-packages.yml'
       - 'pnpm-lock.yaml'
   push:
-    branches: [main]
+    branches: [main, calb/ldap-deploy]
     paths:
-      - 'deploy/client-ui-account/**'
-      - 'deploy/profiles/**'
+      - 'deploy/**'
       - 'apps/cli/package.json'
       - '.github/workflows/publish-calb-packages.yml'
       - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       package:
-        description: Package to publish
+        description: What to publish
         required: true
-        default: dsh-client-ui-account
+        default: all
         type: choice
         options:
+          - all
           - dsh-client-ui-account
+          - calb-ldap-gateway
+          - dsh
 
 permissions:
   contents: read
@@ -41,11 +41,12 @@ concurrency:
 
 env:
   PRIMARY_NODE_VERSION: '24'
+  CALB_PUBLISH_VERSION: '0.1.0'
   DSH_TELEMETRY_DISABLED: '1'
 
 jobs:
   validate:
-    name: Validate CALB package build
+    name: Validate CALB publish build
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
@@ -62,11 +63,17 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      - name: Bundle account plugin
+      - name: Build Harness (dsh CLI)
+        run: pnpm run build
+
+      - name: Build account plugin
         run: pnpm --filter @shangeyao/dsh-client-ui-account run bundle
 
-      - name: Typecheck account plugin
-        run: pnpm --filter @shangeyao/dsh-client-ui-account run typecheck
+      - name: Build LDAP gateway
+        run: pnpm --filter @shangeyao/calb-ldap-gateway run build
+
+      - name: Stage dsh tarball (dry-run)
+        run: node deploy/scripts/prepare-calb-dsh-publish.mjs
 
   publish:
     name: Publish to GitHub Packages
@@ -88,23 +95,44 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      - name: Bundle account plugin
-        if: inputs.package == 'dsh-client-ui-account'
+      - name: Build Harness (dsh CLI)
+        run: pnpm run build
+
+      - name: Build account plugin
+        if: inputs.package == 'all' || inputs.package == 'dsh-client-ui-account' || inputs.package == 'dsh'
         run: pnpm --filter @shangeyao/dsh-client-ui-account run bundle
 
-      - name: Typecheck account plugin
-        if: inputs.package == 'dsh-client-ui-account'
-        run: pnpm --filter @shangeyao/dsh-client-ui-account run typecheck
-
       - name: Publish @shangeyao/dsh-client-ui-account
-        if: inputs.package == 'dsh-client-ui-account'
+        if: inputs.package == 'all' || inputs.package == 'dsh-client-ui-account'
         working-directory: deploy/client-ui-account
         run: npm publish --access restricted
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build LDAP gateway
+        if: inputs.package == 'all' || inputs.package == 'calb-ldap-gateway'
+        run: pnpm --filter @shangeyao/calb-ldap-gateway run build
+
+      - name: Publish @shangeyao/calb-ldap-gateway
+        if: inputs.package == 'all' || inputs.package == 'calb-ldap-gateway'
+        working-directory: deploy/ldap-gateway
+        run: npm publish --access restricted
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stage @shangeyao/dsh tarball
+        if: inputs.package == 'all' || inputs.package == 'dsh'
+        id: dsh_tarball
+        run: echo "path=$(node deploy/scripts/prepare-calb-dsh-publish.mjs)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish @shangeyao/dsh
+        if: inputs.package == 'all' || inputs.package == 'dsh'
+        run: npm publish "${{ steps.dsh_tarball.outputs.path }}" --access restricted
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Summary
-        if: inputs.package == 'dsh-client-ui-account'
         run: |
-          echo "Published @shangeyao/dsh-client-ui-account"
-          echo "https://github.com/${{ github.repository }}/pkgs/npm/dsh-client-ui-account"
+          echo "Published CALB packages @${{ env.CALB_PUBLISH_VERSION }} to GitHub Packages"
+          echo "Install: npm install -g @shangeyao/dsh @shangeyao/calb-ldap-gateway"
+          echo "Docs: deploy/INSTALL.zh.md"
