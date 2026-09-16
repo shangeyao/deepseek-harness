@@ -1,0 +1,14 @@
+# CALB bundle patch（`dsh plugin add @shangeyao/dsh-calb-plugin` 时使用）。
+# calb-gateway 运行时改为生成 cordis.runtime.patch.yml（含绝对路径）。
+
+- id: web-runtime
+  config:
+    printUrl: true
+    openBrowser: false
+    surfaceContext: true
+    trustedHosts: []
+
+- insert:
+    - id: weknora
+      name: "@shangeyao/dsh-calb-plugin/weknora"
+      config: {}
