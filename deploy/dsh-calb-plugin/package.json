@@ -1,6 +1,6 @@
 {
   "name": "@shangeyao/dsh-calb-plugin",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "CALB 多租户 dsh 插件包：LDAP 网关 + LDAP 租户对齐的 WeKnora 检索",
   "type": "module",
   "exports": {

@@ -2,6 +2,8 @@
 
 CALB 多租户 DeepSeek Harness 扩展：**一个包**包含 LDAP 登录网关与租户对齐的 WeKnora 检索。
 
+**兼容 dsh `0.1.6-alpha.1` 及以上**（Node `^22.19 || >=24`）。启用全局模型策略时，请勿在网关 shell 中 export `DEEPSEEK_*` 或 `*_API_KEY`，密钥由超级管理员在 Models 页统一配置。
+
 ## 组成
 
 | 部分 | 路径 | 作用 |

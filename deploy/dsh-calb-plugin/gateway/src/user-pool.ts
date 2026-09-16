@@ -28,6 +28,20 @@ export interface UserBackend {
 
 const LAUNCH_TOKEN_PATTERN = /[?&]token=([A-Za-z0-9_-]{43})/u
 
+/** Strip model credential env vars so dsh 0.1.6+ env precedence cannot bypass shared model policy. */
+function childProcessEnv(
+  parent: NodeJS.ProcessEnv,
+  modelPolicyEnabled: boolean,
+  overrides: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const env = { ...parent, ...overrides }
+  if (!modelPolicyEnabled) return env
+  for (const key of Object.keys(env)) {
+    if (key.endsWith('_API_KEY') || key.startsWith('DEEPSEEK_')) delete env[key]
+  }
+  return env
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path)
@@ -190,8 +204,7 @@ export class UserPool {
 
     const child = spawn(this.config.dshBin, args, {
       cwd: workspace,
-      env: {
-        ...process.env,
+      env: childProcessEnv(process.env, modelPolicyEnabled, {
         DSH_HOME: dshHome,
         DSH_CALB_PLUGIN_ROOT: this.config.calbPluginRoot,
         DSH_TENANT_ID: userId,
@@ -206,7 +219,7 @@ export class UserPool {
         // directory-picker-auto treats SSH launch as remote-browser context and
         // mounts the browse host + browse client pair (in-app directory browser).
         SSH_CONNECTION: 'ldap-gateway',
-      },
+      }),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
