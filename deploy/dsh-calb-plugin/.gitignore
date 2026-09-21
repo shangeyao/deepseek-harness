@@ -3,3 +3,4 @@ cordis.runtime.patch.yml
 gateway/lib/
 dist/
 shared-models/dist/
+account-ui/dist/

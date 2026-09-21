@@ -14,6 +14,9 @@ export interface LdapConfig {
   bindPassword: string
   userSearchFilter: string
   emailAttribute: string
+  groupAttribute: string
+  departmentAttribute: string
+  orgIdAttribute: string
   useSsl: boolean
   startTls: boolean
 }
@@ -38,8 +41,18 @@ export interface GatewayConfig {
   devAllowLocalLogin: boolean
   devLocalUsername: string
   devLocalPassword: string
+  devLocalDepartment: string
+  devLocalCompany: string
+  devLocalGroups: string[]
   /** Lowercase emails allowed to edit platform-wide model settings. */
   superAdminEmails: string[]
+  superAdminGroups: string[]
+  adminGroups: string[]
+  readonlyGroups: string[]
+  weknoraKbMap: Record<string, string[]>
+  weknoraKbGroupMap: Record<string, string[]>
+  defaultKnowledgeBaseIds: string[]
+  cookieSecure: boolean
 }
 
 function envBool(name: string, fallback = false): boolean {
@@ -63,6 +76,35 @@ function required(name: string): string {
   return value
 }
 
+function splitList(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(Boolean)
+}
+
+function parseStringListMap(name: string): Record<string, string[]> {
+  const raw = process.env[name]?.trim()
+  if (raw === undefined || raw === '') return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error(`${name} must be valid JSON`)
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${name} must be a JSON object`)
+  }
+  const result: Record<string, string[]> = {}
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!Array.isArray(value) || !value.every(entry => typeof entry === 'string')) {
+      throw new Error(`${name}.${key} must be a string array`)
+    }
+    result[key] = value.map(entry => entry.trim()).filter(Boolean)
+  }
+  return result
+}
+
 export function loadConfig(): GatewayConfig {
   const dataRoot = resolve(process.env.DSH_DATA_ROOT?.trim() || join(homedir(), '.calb-dsh-data'))
   const ldapEnabled = envBool('LDAP_ENABLED', false)
@@ -77,6 +119,9 @@ export function loadConfig(): GatewayConfig {
     userSearchFilter: process.env.LDAP_USER_SEARCH_FILTER?.trim()
       || '(|(mail={username})(uid={username})(sAMAccountName={username}))',
     emailAttribute: process.env.LDAP_EMAIL_ATTRIBUTE?.trim() || 'mail',
+    groupAttribute: process.env.LDAP_GROUP_ATTRIBUTE?.trim() || 'memberOf',
+    departmentAttribute: process.env.LDAP_DEPARTMENT_ATTRIBUTE?.trim() || 'department',
+    orgIdAttribute: process.env.CALB_ORG_ID_ATTRIBUTE?.trim() || '',
     useSsl: envBool('LDAP_USE_SSL', false),
     startTls: envBool('LDAP_START_TLS', false),
   }
@@ -98,10 +143,14 @@ export function loadConfig(): GatewayConfig {
     .map(entry => entry.trim())
     .filter(Boolean)
   const lanTrust = resolveLanTrust(host, extraTrustedHosts)
-  const superAdminEmails = (process.env.CALB_SUPER_ADMIN_EMAIL ?? '')
-    .split(',')
-    .map(entry => entry.trim().toLowerCase())
-    .filter(Boolean)
+  const superAdminEmails = splitList(process.env.CALB_SUPER_ADMIN_EMAIL)
+    .map(entry => entry.toLowerCase())
+  const superAdminGroups = splitList(process.env.CALB_LDAP_SUPER_ADMIN_GROUPS)
+  const adminGroups = splitList(process.env.CALB_LDAP_ADMIN_GROUPS)
+  const readonlyGroups = splitList(process.env.CALB_LDAP_READONLY_GROUPS)
+  const weknoraKbMap = parseStringListMap('CALB_WEKNORA_KB_MAP')
+  const weknoraKbGroupMap = parseStringListMap('CALB_WEKNORA_KB_GROUP_MAP')
+  const defaultKnowledgeBaseIds = splitList(process.env.WEKNORA_KNOWLEDGE_BASE_IDS)
 
   return {
     host,
@@ -120,7 +169,17 @@ export function loadConfig(): GatewayConfig {
     devAllowLocalLogin,
     devLocalUsername: process.env.DEV_LOCAL_USERNAME?.trim() || 'admin',
     devLocalPassword: process.env.DEV_LOCAL_PASSWORD?.trim() || 'admin',
+    devLocalDepartment: process.env.DEV_LOCAL_DEPARTMENT?.trim() || 'Development',
+    devLocalCompany: process.env.DEV_LOCAL_COMPANY?.trim() || 'CALB',
+    devLocalGroups: splitList(process.env.DEV_LOCAL_GROUPS),
     superAdminEmails,
+    superAdminGroups,
+    adminGroups,
+    readonlyGroups,
+    weknoraKbMap,
+    weknoraKbGroupMap,
+    defaultKnowledgeBaseIds,
+    cookieSecure: envBool('COOKIE_SECURE', false),
   }
 }
 

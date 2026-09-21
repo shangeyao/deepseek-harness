@@ -60,6 +60,15 @@ npm start
 
 生产环境请关闭 `DEV_ALLOW_LOCAL_LOGIN`，并确保防火墙仅允许内网访问 `GATEWAY_PORT`。
 
+## 企业能力（LDAP 组 / 组织租户 / WeKnora KB）
+
+- **LDAP 组 → 角色**：`CALB_LDAP_SUPER_ADMIN_GROUPS`、`CALB_LDAP_ADMIN_GROUPS`、`CALB_LDAP_READONLY_GROUPS`（与 `CALB_SUPER_ADMIN_EMAIL` 并集生效）
+- **组织租户**：从 LDAP `department`（或 `CALB_ORG_ID_ATTRIBUTE`）解析 `orgId`，同部门用户共享 `DSH_TENANT_ID`（WeKnora 检索边界）；每用户 `DSH_HOME` 仍独立
+- **WeKnora KB 映射**：`CALB_WEKNORA_KB_MAP`（按部门）、`CALB_WEKNORA_KB_GROUP_MAP`（按 LDAP 组，优先）
+- **账号菜单**：展示部门/角色，「平台信息」只读面板；只读用户不可打开设置
+
+详见 [`.env.example`](.env.example)。
+
 ## 超级管理员（全局模型配置）
 
 设置 `CALB_SUPER_ADMIN_EMAIL` 为平台管理员的登录邮箱（LDAP 的 `mail` 或开发模式下的 `admin@local`）：

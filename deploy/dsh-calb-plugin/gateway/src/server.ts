@@ -11,11 +11,13 @@ import {
   readCsrfCookie,
   readSessionToken,
   setSessionCookie,
-  stableUserId,
   verifyToken,
 } from './auth.js'
+import { auditLog } from './audit.js'
 import { hasDshSessionForBackend } from './dsh-cookie.js'
+import { buildUserIdentity, devIdentityDefaults, identityFromPrincipal, userStorageId } from './identity.js'
 import { ldapAuthenticate } from './ldap.js'
+import { isModelPolicyEnabled } from './rbac.js'
 import { proxyHttp, proxyWebSocket } from './proxy.js'
 import { UserPool } from './user-pool.js'
 
@@ -42,6 +44,22 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(prefix))
 }
 
+function statusPayload(principal: NonNullable<ReturnType<typeof verifyToken>>): Record<string, unknown> {
+  return {
+    authenticated: true,
+    username: principal.username,
+    email: principal.email,
+    displayName: principal.displayName,
+    userId: principal.userId,
+    groups: principal.groups,
+    department: principal.department,
+    orgId: principal.orgId,
+    tenantId: principal.tenantId,
+    role: principal.role,
+    knowledgeBaseIds: principal.knowledgeBaseIds,
+  }
+}
+
 export async function startGateway(config: GatewayConfig): Promise<{ close: () => Promise<void> }> {
   const pool = new UserPool(config)
   const publicDir = join(ROOT, '..', 'public')
@@ -54,7 +72,11 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
       const pathname = url.pathname
 
       if (pathname === '/health') {
-        json(res, 200, { ok: true })
+        json(res, 200, {
+          ok: true,
+          activeBackends: pool.activeBackendCount(),
+          ldapEnabled: config.ldap.enabled,
+        })
         return
       }
 
@@ -68,7 +90,7 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
         const csrf = newCsrfToken()
         res.writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
-          'set-cookie': cookieHeader('dsh_csrf', csrf, 3600),
+          'set-cookie': cookieHeader('dsh_csrf', csrf, 3600, config.cookieSecure),
         })
         res.end(loginHtml.replace('__CSRF__', csrf))
         return
@@ -81,13 +103,7 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
           json(res, 200, { authenticated: false })
           return
         }
-        json(res, 200, {
-          authenticated: true,
-          username: principal.username,
-          email: principal.email,
-          displayName: principal.displayName,
-          userId: principal.userId,
-        })
+        json(res, 200, statusPayload(principal))
         return
       }
 
@@ -114,38 +130,60 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
           return
         }
 
-        let identity = null as null | { username: string; email: string; displayName: string }
+        let identity = null as ReturnType<typeof buildUserIdentity> | null
         if (config.ldap.enabled) {
           const ldapUser = await ldapAuthenticate(username, password, config.ldap)
           if (ldapUser !== null) {
-            identity = {
+            identity = buildUserIdentity({
               username: ldapUser.username,
               email: ldapUser.email,
               displayName: ldapUser.displayName,
-            }
+              groups: ldapUser.groups,
+              department: ldapUser.department,
+              company: ldapUser.company,
+              orgIdAttribute: ldapUser.orgIdAttribute,
+            }, config)
           }
         } else if (config.devAllowLocalLogin
           && username === config.devLocalUsername
           && password === config.devLocalPassword) {
-          identity = {
+          const devDefaults = devIdentityDefaults(config)
+          identity = buildUserIdentity({
             username,
             email: `${username}@local`,
             displayName: username,
-          }
+            ...devDefaults,
+          }, config)
         }
 
         if (identity === null) {
+          auditLog('login_failed', { username, ldap: config.ldap.enabled })
           json(res, 401, { error: 'invalid-credentials' })
           return
         }
 
-        const userId = stableUserId(identity.username)
+        const userId = userStorageId(identity.username)
         const sessionToken = createToken({
           username: identity.username,
           email: identity.email,
           displayName: identity.displayName,
           userId,
+          groups: identity.groups,
+          department: identity.department,
+          company: identity.company,
+          orgId: identity.orgId,
+          tenantId: identity.tenantId,
+          role: identity.role,
+          knowledgeBaseIds: identity.knowledgeBaseIds,
         }, config)
+
+        auditLog('login_success', {
+          username: identity.username,
+          role: identity.role,
+          orgId: identity.orgId,
+          tenantId: identity.tenantId,
+          department: identity.department,
+        })
 
         let backend
         try {
@@ -157,22 +195,30 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
         }
 
         const launchToken = backend.launchToken
-        const redirect = launchToken === undefined ? '/' : `/?token=${launchToken}`
+        const redirectTo = launchToken === undefined ? '/' : `/?token=${launchToken}`
 
         res.writeHead(200, {
           'content-type': 'application/json; charset=utf-8',
-          'set-cookie': setSessionCookie(sessionToken, config.tokenExpirySeconds),
+          'set-cookie': setSessionCookie(sessionToken, config.tokenExpirySeconds, config.cookieSecure),
         })
         res.end(JSON.stringify({
           ok: true,
           username: identity.username,
           displayName: identity.displayName,
-          redirect,
+          role: identity.role,
+          department: identity.department,
+          redirect: redirectTo,
         }))
         return
       }
 
       if (pathname === '/auth/logout' && req.method === 'POST') {
+        const token = readSessionToken(req)
+        const principal = token === undefined ? null : verifyToken(token, config)
+        if (principal !== null) {
+          auditLog('logout', { username: principal.username, userId: principal.userId })
+          await pool.stop(principal.userId)
+        }
         res.writeHead(200, {
           'content-type': 'application/json; charset=utf-8',
           'set-cookie': clearSessionCookie(),
@@ -197,11 +243,8 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
         return
       }
 
-      const backend = await pool.ensure({
-        username: principal.username,
-        email: principal.email,
-        displayName: principal.displayName,
-      })
+      const identity = identityFromPrincipal(principal)
+      const backend = await pool.ensure(identity)
 
       if (
         req.method === 'GET'
@@ -236,11 +279,8 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
         return
       }
       try {
-        const backend = await pool.ensure({
-          username: principal.username,
-          email: principal.email,
-          displayName: principal.displayName,
-        })
+        const identity = identityFromPrincipal(principal)
+        const backend = await pool.ensure(identity)
         proxyWebSocket(req, socket, head, backend)
       } catch {
         socket.destroy()
@@ -268,8 +308,9 @@ export async function startGateway(config: GatewayConfig): Promise<{ close: () =
   if (config.trustedHosts.length > 0) {
     process.stdout.write(`  dsh trustedHosts: ${config.trustedHosts.join(', ')}\n`)
   }
-  if (config.superAdminEmails.length > 0) {
-    process.stdout.write(`  model super admin: ${config.superAdminEmails.join(', ')}\n`)
+  if (isModelPolicyEnabled(config)) {
+    const admins = [...config.superAdminEmails, ...config.superAdminGroups]
+    process.stdout.write(`  model super admin: ${admins.join(', ')}\n`)
   }
 
   return {

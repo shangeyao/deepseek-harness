@@ -9,6 +9,6 @@
     trustedHosts: []
 
 - insert:
-    - id: weknora
-      name: "@shangeyao/dsh-calb-plugin/weknora"
+    - id: dsh-calb-plugin
+      name: "@shangeyao/dsh-calb-plugin"
       config: {}
