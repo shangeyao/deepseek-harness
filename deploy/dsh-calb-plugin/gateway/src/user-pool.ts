@@ -3,14 +3,12 @@ import { createServer } from 'node:net'
 import { mkdir, writeFile, access } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { GatewayConfig } from './config.js'
-import { isSuperAdminEmail } from './config.js'
-import { stableUserId } from './auth.js'
+import type { UserIdentity } from './identity.js'
+import { shouldSyncSharedModels, userStorageId } from './identity.js'
+import { isModelPolicyEnabled, isSuperAdminRole } from './rbac.js'
+import { formatKnowledgeBaseIds } from './weknora-policy.js'
 
-export interface UserIdentity {
-  username: string
-  email: string
-  displayName: string
-}
+export type { UserIdentity } from './identity.js'
 
 export interface UserBackend {
   userId: string
@@ -28,6 +26,8 @@ export interface UserBackend {
 
 const LAUNCH_TOKEN_PATTERN = /[?&]token=([A-Za-z0-9_-]{43})/u
 
+const PRESERVED_API_KEYS = new Set(['WEKNORA_API_KEY'])
+
 /** Strip model credential env vars so dsh 0.1.6+ env precedence cannot bypass shared model policy. */
 function childProcessEnv(
   parent: NodeJS.ProcessEnv,
@@ -37,6 +37,7 @@ function childProcessEnv(
   const env = { ...parent, ...overrides }
   if (!modelPolicyEnabled) return env
   for (const key of Object.keys(env)) {
+    if (PRESERVED_API_KEYS.has(key)) continue
     if (key.endsWith('_API_KEY') || key.startsWith('DEEPSEEK_')) delete env[key]
   }
   return env
@@ -133,8 +134,12 @@ export class UserPool {
     this.sweeper.unref()
   }
 
+  activeBackendCount(): number {
+    return this.backends.size
+  }
+
   async ensure(user: UserIdentity): Promise<UserBackend> {
-    const userId = stableUserId(user.username)
+    const userId = userStorageId(user.username)
     const existing = this.backends.get(userId)
     if (existing !== undefined) {
       if (isBackendAlive(existing)) {
@@ -169,6 +174,13 @@ export class UserPool {
     return backend
   }
 
+  async stop(userId: string): Promise<void> {
+    const backend = this.backends.get(userId)
+    if (backend === undefined) return
+    this.backends.delete(userId)
+    await this.stopBackend(backend)
+  }
+
   async shutdown(): Promise<void> {
     clearInterval(this.sweeper)
     await Promise.all([...this.backends.values()].map(backend => this.stopBackend(backend)))
@@ -181,7 +193,7 @@ export class UserPool {
     const workspace = join(baseDir, 'workspace')
     await ensureUserLayout(baseDir, dshHome, workspace, user.displayName)
 
-    if (this.config.superAdminEmails.length > 0 && !isSuperAdminEmail(user.email, this.config)) {
+    if (shouldSyncSharedModels(user, this.config)) {
       const storePath = join(this.config.calbPluginRoot, 'shared-models/dist/store.js')
       const store = await import(storePath) as {
         syncSharedModelsToUser: (sharedDir: string, dshHome: string) => Promise<void>
@@ -191,8 +203,9 @@ export class UserPool {
     }
 
     const port = await reservePort()
-    const modelPolicyEnabled = this.config.superAdminEmails.length > 0
-    const isSuperAdmin = modelPolicyEnabled && isSuperAdminEmail(user.email, this.config)
+    const modelPolicyEnabled = isModelPolicyEnabled(this.config)
+    const isSuperAdmin = isSuperAdminRole(user.role)
+    const kbIds = formatKnowledgeBaseIds(user.knowledgeBaseIds)
     const args = ['--profile', this.config.dshProfile]
     if (this.config.dshPatch !== undefined) {
       args.push('--patch', this.config.dshPatch)
@@ -207,17 +220,21 @@ export class UserPool {
       env: childProcessEnv(process.env, modelPolicyEnabled, {
         DSH_HOME: dshHome,
         DSH_CALB_PLUGIN_ROOT: this.config.calbPluginRoot,
-        DSH_TENANT_ID: userId,
-        CALB_USER_TENANT_ID: userId,
+        DSH_TENANT_ID: user.tenantId,
+        CALB_USER_TENANT_ID: user.tenantId,
+        CALB_USER_ORG_ID: user.orgId,
+        CALB_USER_USERNAME: user.username,
+        CALB_USER_DISPLAY_NAME: user.displayName,
         CALB_USER_EMAIL: user.email,
+        CALB_USER_ROLE: user.role,
+        CALB_USER_DEPARTMENT: user.department,
         CALB_DATA_ROOT: this.config.dataRoot,
+        ...(kbIds !== undefined ? { WEKNORA_KNOWLEDGE_BASE_IDS: kbIds } : {}),
         ...(modelPolicyEnabled ? { CALB_MODEL_POLICY_ENABLED: 'true' } : {}),
         ...(isSuperAdmin ? { CALB_IS_SUPER_ADMIN: 'true' } : {}),
         ...(this.config.superAdminEmails[0] !== undefined
           ? { CALB_SUPER_ADMIN_EMAIL: this.config.superAdminEmails.join(',') }
           : {}),
-        // directory-picker-auto treats SSH launch as remote-browser context and
-        // mounts the browse host + browse client pair (in-app directory browser).
         SSH_CONNECTION: 'ldap-gateway',
       }),
       stdio: ['ignore', 'pipe', 'pipe'],

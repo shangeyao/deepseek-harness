@@ -4,15 +4,18 @@
   "description": "CALB 多租户 dsh 插件包：LDAP 网关 + LDAP 租户对齐的 WeKnora 检索",
   "type": "module",
   "exports": {
-    ".": "./dist/weknora/index.js",
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
     "./weknora": "./dist/weknora/index.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
+    "dist/index.js",
+    "dist/client.js",
     "dist/weknora",
     "shared-models/dist",
-    "shared-models/package.json",
+    "account-ui/dist",
     "gateway/lib",
     "gateway/public",
     "cordis.patch.yml",
@@ -26,10 +29,11 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "build": "npm run build --prefix shared-models && tsc -p weknora/tsconfig.json && tsc -p gateway/tsconfig.json",
+    "build": "npm run build --prefix shared-models && npm run build --prefix account-ui && tsc -p weknora/tsconfig.json && node build-host.mjs && node build-client.mjs && tsc -p gateway/tsconfig.json",
     "prepublishOnly": "npm run build",
     "start": "node gateway/lib/index.js",
-    "typecheck": "tsc -p weknora/tsconfig.json --noEmit && tsc -p gateway/tsconfig.json --noEmit"
+    "typecheck": "tsc -p weknora/tsconfig.json --noEmit && tsc -p gateway/tsconfig.json --noEmit",
+    "test": "tsc -p gateway/tsconfig.json && node --test gateway/tests/*.test.js"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -42,6 +46,7 @@
   "license": "MIT",
   "dependencies": {
     "@wxg-prc-cpg/dsh-weknora": "^0.1.0",
+    "dotenv": "^16.6.1",
     "ldapts": "^8.0.9",
     "yaml": "^2.8.0"
   },
@@ -53,6 +58,14 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "remote",
+        "slots",
+        "locale"
+      ]
     }
   }
 }

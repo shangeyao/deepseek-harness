@@ -1,11 +1,19 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { GatewayConfig } from './config.js'
+import type { CalbRole } from './rbac.js'
 
 export interface AuthPrincipal {
   username: string
   email: string
   displayName: string
   userId: string
+  groups: string[]
+  department: string
+  company: string
+  orgId: string
+  tenantId: string
+  role: CalbRole
+  knowledgeBaseIds: string[]
   exp: number
 }
 
@@ -47,10 +55,23 @@ export function verifyToken(token: string, config: GatewayConfig): AuthPrincipal
   if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null
 
   try {
-    const payload = JSON.parse(fromB64url(body).toString('utf8')) as AuthPrincipal
+    const payload = JSON.parse(fromB64url(body).toString('utf8')) as Partial<AuthPrincipal>
     if (!payload.username || !payload.userId || !payload.exp) return null
     if (payload.exp < Math.floor(Date.now() / 1000)) return null
-    return payload
+    return {
+      username: payload.username,
+      email: payload.email ?? '',
+      displayName: payload.displayName ?? payload.username,
+      userId: payload.userId,
+      groups: payload.groups ?? [],
+      department: payload.department ?? '',
+      company: payload.company ?? '',
+      orgId: payload.orgId ?? 'default',
+      tenantId: payload.tenantId ?? payload.userId,
+      role: payload.role ?? 'user',
+      knowledgeBaseIds: payload.knowledgeBaseIds ?? [],
+      exp: payload.exp,
+    }
   } catch {
     return null
   }
@@ -65,8 +86,10 @@ export function parseCookie(header: string | undefined, name: string): string | 
   return undefined
 }
 
-export function setSessionCookie(token: string, maxAgeSeconds: number): string {
-  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(maxAgeSeconds)}`
+export function setSessionCookie(token: string, maxAgeSeconds: number, secure = false): string {
+  const flags = ['Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${String(maxAgeSeconds)}`]
+  if (secure) flags.push('Secure')
+  return `${COOKIE_NAME}=${encodeURIComponent(token)}; ${flags.join('; ')}`
 }
 
 export function clearSessionCookie(): string {
@@ -83,8 +106,10 @@ export function newCsrfToken(): string {
   return randomBytes(16).toString('hex')
 }
 
-export function cookieHeader(name: string, value: string, maxAgeSeconds: number): string {
-  return `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=${String(maxAgeSeconds)}`
+export function cookieHeader(name: string, value: string, maxAgeSeconds: number, secure = false): string {
+  const flags = ['Path=/', 'SameSite=Lax', `Max-Age=${String(maxAgeSeconds)}`]
+  if (secure) flags.push('Secure')
+  return `${name}=${encodeURIComponent(value)}; ${flags.join('; ')}`
 }
 
 export function readCsrfCookie(req: { headers: Record<string, string | string[] | undefined> }): string | undefined {

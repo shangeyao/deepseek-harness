@@ -47,7 +47,8 @@ function denyModelWrite(action: string, target: string): never {
 export function apply(ctx: HarnessContext): void {
   if (!envFlag('CALB_MODEL_POLICY_ENABLED')) return
 
-  const isSuperAdmin = envFlag('CALB_IS_SUPER_ADMIN')
+  const role = process.env.CALB_USER_ROLE?.trim()
+  const isSuperAdmin = envFlag('CALB_IS_SUPER_ADMIN') || role === 'super_admin'
   const dataRoot = process.env.CALB_DATA_ROOT?.trim()
   const dshHome = process.env.DSH_HOME?.trim()
   if (dataRoot === undefined || dataRoot === '') {

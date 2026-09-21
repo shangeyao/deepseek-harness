@@ -1,10 +1,16 @@
 #!/usr/bin/env node
+import { config as loadDotenv } from 'dotenv'
 import { watch } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { loadConfig } from './config.js'
+import { isModelPolicyEnabled } from './rbac.js'
 import { writeRuntimePatch } from './patch.js'
 import { startGateway } from './server.js'
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+loadDotenv({ path: join(packageRoot, '.env') })
 
 const config = loadConfig()
 if (process.env.CALB_DSH_PATCH?.trim() === undefined) {
@@ -12,7 +18,7 @@ if (process.env.CALB_DSH_PATCH?.trim() === undefined) {
 }
 
 let fanoutQueued = false
-if (config.superAdminEmails.length > 0) {
+if (isModelPolicyEnabled(config)) {
   const sharedModelsDirPath = join(config.dataRoot, 'shared', 'models')
   await mkdir(sharedModelsDirPath, { recursive: true })
   watch(sharedModelsDirPath, (_event, filename) => {

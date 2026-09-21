@@ -8,14 +8,31 @@ function escapeFilterValue(value: string): string {
 }
 
 function readAttribute(entry: Record<string, unknown>, attribute: string): string {
-  const raw = entry[attribute]
-  if (Array.isArray(raw) && raw.length > 0) {
-    return String(raw[0]).trim()
-  }
-  if (typeof raw === 'string' && raw.trim()) {
-    return raw.trim()
+  const keys = [attribute, attribute.toLowerCase(), attribute.toUpperCase()]
+  for (const key of keys) {
+    const raw = entry[key]
+    if (Array.isArray(raw) && raw.length > 0) {
+      return String(raw[0]).trim()
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+      return raw.trim()
+    }
   }
   return ''
+}
+
+function readAttributeList(entry: Record<string, unknown>, attribute: string): string[] {
+  const keys = [attribute, attribute.toLowerCase(), attribute.toUpperCase()]
+  for (const key of keys) {
+    const raw = entry[key]
+    if (Array.isArray(raw)) {
+      return raw.map(value => String(value).trim()).filter(Boolean)
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+      return [raw.trim()]
+    }
+  }
+  return []
 }
 
 export interface LdapUser {
@@ -23,6 +40,10 @@ export interface LdapUser {
   email: string
   displayName: string
   dn: string
+  groups: string[]
+  department: string
+  company: string
+  orgIdAttribute: string
 }
 
 export async function ldapAuthenticate(
@@ -50,10 +71,22 @@ export async function ldapAuthenticate(
     }
 
     const searchFilter = config.userSearchFilter.replace('{username}', escapeFilterValue(loginId))
+    const searchAttributes = [
+      config.emailAttribute,
+      'cn',
+      'displayName',
+      'uid',
+      'mail',
+      config.groupAttribute,
+      config.departmentAttribute,
+      'company',
+      'o',
+      ...(config.orgIdAttribute !== '' ? [config.orgIdAttribute] : []),
+    ]
     const { searchEntries } = await client.search(config.baseDn, {
       scope: 'sub',
       filter: searchFilter,
-      attributes: [config.emailAttribute, 'cn', 'displayName', 'uid', 'mail'],
+      attributes: [...new Set(searchAttributes)],
     })
 
     if (searchEntries.length === 0) return null
@@ -76,7 +109,7 @@ export async function ldapAuthenticate(
       await userClient.unbind().catch(() => {})
     }
 
-    let displayName = readAttribute(entry, 'displayName')
+    const displayName = readAttribute(entry, 'displayName')
       || readAttribute(entry, 'cn')
       || readAttribute(entry, 'uid')
       || email.split('@')[0]
@@ -87,6 +120,12 @@ export async function ldapAuthenticate(
       email,
       displayName,
       dn: userDn,
+      groups: readAttributeList(entry, config.groupAttribute),
+      department: readAttribute(entry, config.departmentAttribute),
+      company: readAttribute(entry, 'company') || readAttribute(entry, 'o'),
+      orgIdAttribute: config.orgIdAttribute !== ''
+        ? readAttribute(entry, config.orgIdAttribute)
+        : '',
     }
   } catch {
     return null
